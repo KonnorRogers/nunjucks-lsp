@@ -1,0 +1,20 @@
+{
+  "name": "webawesome-lsp-server",
+  "description": "REPLACE_ME",
+  "version": "1.0.0",
+  "author": "REPLACE_ME",
+  "license": "MIT",
+  "engines": {
+    "node": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "REPLACE_ME"
+  },
+  "dependencies": {
+    "vscode-css-languageservice": "^6.3.2",
+    "vscode-html-languageservice": "^5.3.1",
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.8"
+  }
+}
