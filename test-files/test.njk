@@ -8,11 +8,8 @@
   <body>
     {{ data.foo }}
     {{ data.foo }}
-    {{ foo  }}
 
-    {{ }}
-
-    {{ include "foo" }}
+    {{ foo | first }}
 
     {% for item in items %}
       {{ item.foo }}

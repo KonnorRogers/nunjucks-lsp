@@ -11,16 +11,7 @@
     "incremental": true,
     "declaration": true,
     "composite": true,
-    "paths": {
-      "@core/*": [
-        "../core/out/*",
-      ]
-    }
   },
   "include": ["src"],
   "exclude": ["node_modules", ".vscode-test"],
-
-  "references": [
-    { "path": "../core" },
-  ]
 }

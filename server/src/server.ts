@@ -31,9 +31,10 @@ import {
   writeFileSync
 } from "fs";
 import { NunjucksSettings } from "./settings/nunjucksSettings";
-// import { NunjucksParser } from "./core/nunjucksParser";
-// import { NunjucksCompletionProvider } from "./core/nunjucksCompletion";
-// import { NunjucksValidator } from "./core/nunjucksValidator";
+import { NunjucksParser } from "./core/nunjucksParser";
+import { NunjucksCompletionProvider } from "./core/nunjucksCompletion";
+import { NunjucksValidator } from "./core/nunjucksValidator";
+import { NunjucksHoverProvider } from "./core/nunjucksHover";
 
 const debugFile = "/Users/konnorrogers/debug.log"
 writeFileSync(debugFile, "")
@@ -66,12 +67,10 @@ const defaultSettings: NunjucksSettings = {
 let globalSettings: NunjucksSettings = defaultSettings;
 
 // Initialize analyzers
-// const parser = new NunjucksParser(defaultSettings);
-// const nunjucksCompletionProvider = new NunjucksCompletionProvider(analyzer);
-// const nunjucksHoverProvider = new NunjucksHoverProvider(analyzer)
-// const validator = new NunjucksValidator(analyzer);
-
-const hoverProvider = new NunjucksHoverProvider(analyzer)
+const parser = new NunjucksParser(defaultSettings);
+const nunjucksCompletionProvider = new NunjucksCompletionProvider(parser);
+const nunjucksValidator = new NunjucksValidator(parser);
+const nunjucksHoverProvider = new NunjucksHoverProvider(parser)
 
 
 // Cache the settings of all open documents
@@ -111,7 +110,7 @@ connection.onInitialize((params: InitializeParams) => {
       },
       hoverProvider: true,
       diagnosticProvider: {
-        interFileDependencies: false,
+        interFileDependencies: true,
         workspaceDiagnostics: false
       }
     },
@@ -173,7 +172,7 @@ async function getTextDocumentDiagnostics (textDocument: TextDocumentIdentifier)
       } satisfies DocumentDiagnosticReport;
     }
 
-    const diagnostics = validator.validate(document, settings);
+    const diagnostics = nunjucksValidator.validate(document, settings);
 
     return {
       kind: DocumentDiagnosticReportKind.Full,
@@ -214,7 +213,7 @@ connection.onHover(async (params): Promise<Hover | null> => {
       return null;
     }
 
-    return hoverProvider.provideHover(document, params.position, settings);
+    return nunjucksHoverProvider.provideHover(document, params.position, settings);
   } catch (error) {
     connection.console.error(`Error in hover provider: ${error}`);
     return null;

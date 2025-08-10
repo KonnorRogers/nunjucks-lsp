@@ -6,10 +6,33 @@ import { NunjucksParser } from "./nunjucksParser";
 export class NunjucksValidator {
   constructor(public parser: NunjucksParser) {}
 
-  validate(document: TextDocument, settings: NunjucksSettings): Diagnostic[] {
-    const diagnostics: Diagnostic[] = [];
+  validate(document: TextDocument, settings: Partial<NunjucksSettings>): Diagnostic[] {
     const content = document.getText();
-    const lines = content.split('\n');
+    return this.validateContent(content, settings)
+  }
+
+  validateContent (content: string, settings: Partial<NunjucksSettings>): Diagnostic[] {
+    const diagnostics: Diagnostic[] = [];
+    const result = this.parser.parseContent(content)
+    if (result.ast) {
+      return diagnostics
+    }
+
+    if (result.error) {
+      diagnostics.push({
+        message: result.error.message,
+        range: {
+          start: {
+            line: result.error.lineno,
+            character: result.error.colno,
+          },
+          end: {
+            line: result.error.lineno,
+            character: result.error.colno,
+          }
+        }
+      })
+    }
 
     return diagnostics
   }
