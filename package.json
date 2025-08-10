@@ -28,17 +28,35 @@
     "workspaceContains:**/package.json"
   ],
   "main": "./client/out/vscode",
-  "contributes": {
-    "configuration": {}
-  },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc --build",
     "watch": "tsc -b -w",
-    "postinstall": "cd client && npm install && cd ../server && npm install && cd .. && cd core && npm install && cd .."
+    "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
   },
   "devDependencies": {
     "@types/node": "^20.5.7",
     "typescript": "^5.2.2"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "nunjucks",
+        "aliases": ["Nunjucks", "nunjucks"],
+        "extensions": [".njk", ".nunjucks", ".html"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Nunjucks LSP Configuration",
+      "properties": {
+        "nunjucksLsp.templatePaths": {
+          "type": "array",
+          "default": ["./templates", "./views"],
+          "description": "Paths to search for Nunjucks templates"
+        }
+      }
+    }
   }
 }

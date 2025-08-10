@@ -3,9 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { getCSSLanguageService } from 'vscode-css-languageservice';
+import { CompletionItem, CompletionList, getCSSLanguageService } from 'vscode-css-languageservice';
 import {
-	CompletionList,
 	Diagnostic,
 	getLanguageService as getHTMLLanguageService,
 	Position,

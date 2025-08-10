@@ -5,121 +5,38 @@ import {
   InitializeParams,
   TextDocumentSyncKind,
   InitializeResult,
-  TextDocumentPositionParams,
   CompletionItem,
-  CompletionItemKind,
+  // CompletionItemKind,
+  DocumentDiagnosticReportKind,
+  DocumentDiagnosticReport,
+  DidChangeConfigurationNotification,
+  TextDocumentPositionParams,
+  TextDocumentIdentifier,
+  DidChangeWatchedFilesNotification,
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
-import {CSSParser, expandStylesheet} from "../../core/out/index.js"
-import { CompletionList, LanguageMode, LanguageModes, getLanguageModes } from "./languageModes";
-import { getCSSMode } from "./modes/cssMode";
-import { getCSSLanguageService } from "vscode-css-languageservice";
-import { appendFileSync, writeFileSync } from "fs";
+import {
+    CompletionList,
+    Hover,
+    LanguageMode,
+  // CompletionList,
+  // LanguageMode,
+  LanguageModes,
+  getLanguageModes
+} from "./languageModes";
 
-let parsedStylesheets: CSSParser[] = []
-let cssVariableCompletions: CompletionItem[] = []
-let cssUtilityClasses: CompletionItem[] = []
-let waStylesheet = ""
+import {
+  // appendFileSync,
+  writeFileSync
+} from "fs";
+import { NunjucksSettings } from "./settings/nunjucksSettings";
+// import { NunjucksParser } from "./core/nunjucksParser";
+// import { NunjucksCompletionProvider } from "./core/nunjucksCompletion";
+// import { NunjucksValidator } from "./core/nunjucksValidator";
 
 const debugFile = "/Users/konnorrogers/debug.log"
 writeFileSync(debugFile, "")
-
-
-expandStylesheet("https://early.webawesome.com/webawesome@3.0.0-alpha.7/dist/styles/webawesome.css")
-  .then((stylesheet) => {
-    // appendFileSync(debugFile, "quiet.css -> " + stylesheet)
-
-    const parsedCSS = new CSSParser(stylesheet)
-    parsedStylesheets.push(parsedCSS)
-    waStylesheet = stylesheet
-
-    ;[...parsedCSS.utilityClasses].forEach((selector) => {
-      const obj: CompletionItem =  {
-        label: selector,
-        // detail: value,
-        // documentation,
-        kind: CompletionItemKind.Class
-      }
-
-      cssUtilityClasses.push(obj)
-    })
-
-    ;[...parsedCSS.cssVariables].forEach(([variable, value]) => {
-      let documentation = ""
-      if (variable.includes("-space-")) {
-        documentation = "Web Awesome Spacing Token"
-      } else if (variable.includes("-color-")) {
-        documentation = "Web Awesome Color Token"
-      } else if (variable.includes("-shadow-")) {
-        documentation = "Web Awesome Box Shadow Token"
-      } else {
-        documentation = "Web Awesome Token"
-      }
-
-      const obj: CompletionItem =  {
-        label: variable,
-        detail: value,
-        documentation,
-        kind: CompletionItemKind.Property
-      }
-
-      const withVarObj = {...obj, label: "var(" + obj.label + ")"}
-
-      cssVariableCompletions.push(obj, withVarObj)
-    })
-  })
-  .catch((e) => {
-    appendFileSync(debugFile, "Error: " + e.toString())
-  })
-
-
-// TODO: Should probably cache this call to "expandStylesheet"
-expandStylesheet("https://early.webawesome.com/webawesome@3.0.0-alpha.7/dist/styles/themes/default.css")
-  .then((stylesheet) => {
-    // appendFileSync(debugFile, "restyle.css -> " + stylesheet)
-    const parsedCSS = new CSSParser(stylesheet)
-    parsedStylesheets.push(parsedCSS)
-    waStylesheet = stylesheet
-
-    ;[...parsedCSS.utilityClasses].forEach((selector) => {
-      const obj: CompletionItem =  {
-        label: selector,
-        // detail: value,
-        // documentation,
-        kind: CompletionItemKind.Class
-      }
-
-      cssUtilityClasses.push(obj)
-    })
-
-    ;[...parsedCSS.cssVariables].forEach(([variable, value]) => {
-      let documentation = ""
-      if (variable.includes("-space-")) {
-        documentation = "Web Awesome Spacing Token"
-      } else if (variable.includes("-color-")) {
-        documentation = "Web Awesome Color Token"
-      } else if (variable.includes("-shadow-")) {
-        documentation = "Web Awesome Box Shadow Token"
-      } else {
-        documentation = "Web Awesome Token"
-      }
-
-      const obj: CompletionItem =  {
-        label: variable,
-        detail: value,
-        documentation,
-        kind: CompletionItemKind.Property
-      }
-
-      const withVarObj = {...obj, label: "var(" + obj.label + ")"}
-
-      cssVariableCompletions.push(obj, withVarObj)
-    })
-  })
-  .catch((e) => {
-    appendFileSync(debugFile, "Error: " + e.toString())
-  })
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -130,83 +47,227 @@ const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 let languageModes: LanguageModes;
 
-connection.onInitialize((params: InitializeParams) => {
-	languageModes = getLanguageModes();
+let hasConfigurationCapability = false;
+let hasWorkspaceFolderCapability = false;
+let hasDiagnosticRelatedInformationCapability = false;
 
-	documents.onDidClose(e => {
-		languageModes.onDocumentRemoved(e.document);
-	});
-	connection.onShutdown(() => {
-		languageModes.dispose();
-	});
+
+// Default settings
+const defaultSettings: NunjucksSettings = {
+  maxNumberOfProblems: 1000,
+  templatePaths: ['./templates', './views'],
+  enabledFeatures: {
+    completion: true,
+    diagnostics: true,
+    hover: true
+  }
+};
+
+let globalSettings: NunjucksSettings = defaultSettings;
+
+// Initialize analyzers
+// const parser = new NunjucksParser(defaultSettings);
+// const nunjucksCompletionProvider = new NunjucksCompletionProvider(analyzer);
+// const nunjucksHoverProvider = new NunjucksHoverProvider(analyzer)
+// const validator = new NunjucksValidator(analyzer);
+
+const hoverProvider = new NunjucksHoverProvider(analyzer)
+
+
+// Cache the settings of all open documents
+const documentSettings: Map<string, Thenable<NunjucksSettings>> = new Map();
+
+connection.onInitialize((params: InitializeParams) => {
+  languageModes = getLanguageModes();
+
+  documents.onDidClose(e => {
+	  languageModes.onDocumentRemoved(e.document);
+          documentSettings.delete(e.document.uri);
+  });
+  connection.onShutdown(() => {
+	  languageModes.dispose();
+  });
+  const capabilities = params.capabilities;
+
+  hasConfigurationCapability = !!(
+    capabilities.workspace && !!capabilities.workspace.configuration
+  );
+  hasWorkspaceFolderCapability = !!(
+    capabilities.workspace && !!capabilities.workspace.workspaceFolders
+  );
+  hasDiagnosticRelatedInformationCapability = !!(
+    capabilities.textDocument &&
+    capabilities.textDocument.publishDiagnostics &&
+    capabilities.textDocument.publishDiagnostics.relatedInformation
+  );
 
   const result: InitializeResult = {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       completionProvider: {
-         resolveProvider: true
+        resolveProvider: true,
+        // TODO: update to use the lexer completion chars.
+        triggerCharacters: ['.', '|', '{', '%', '#']
       },
+      hoverProvider: true,
+      diagnosticProvider: {
+        interFileDependencies: false,
+        workspaceDiagnostics: false
+      }
     },
+    serverInfo: {
+      name: "nunjucks-lsp",
+      version: "0.1.0"
+    }
   };
 
   return result;
 });
 
-// documents.onDidChangeContent((change) => {
-//   connection.window.showInformationMessage(
-//     "onDidChangeContent: " + change.document.uri
-//   );
-// });
+connection.onInitialized(() => {
+  if (hasConfigurationCapability) {
+    // Register for all configuration changes
+    connection.client.register(DidChangeConfigurationNotification.type, undefined);
+  }
+  if (hasWorkspaceFolderCapability) {
+    connection.workspace.onDidChangeWorkspaceFolders(_event => {
+      connection.console.log('Workspace folder change event received.');
+    });
+  }
+  connection.client.register(DidChangeWatchedFilesNotification.type, {
+    watchers: [
+      { globPattern: `**/**/*.md` },
+      { globPattern: `**/**/*.njk` },
+    ],
+  })
+});
 
-connection.onCompletion(async (textDocumentPosition, token) => {
-  const document = documents.get(textDocumentPosition.textDocument.uri);
-  if (!document) {
+connection.onDidChangeConfiguration(change => {
+  if (hasConfigurationCapability) {
+    // Reset all cached document settings
+    documentSettings.clear();
+  } else {
+    globalSettings = <NunjucksSettings>(
+      (change.settings.nunjucksLsp || defaultSettings)
+    );
+  }
+
+  // Revalidate all open text documents
+  documents.all().forEach(sendDiagnostics);
+});
+
+// The content of a text document has changed
+documents.onDidChangeContent(change => {
+  sendDiagnostics(change.document);
+});
+
+async function getTextDocumentDiagnostics (textDocument: TextDocumentIdentifier) {
+  const document = documents.get(textDocument.uri);
+  if (document !== undefined) {
+    const settings = await getDocumentSettings(document.uri);
+
+    if (!settings.enabledFeatures.diagnostics) {
+      return {
+        kind: DocumentDiagnosticReportKind.Full,
+        items: []
+      } satisfies DocumentDiagnosticReport;
+    }
+
+    const diagnostics = validator.validate(document, settings);
+
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: diagnostics
+    } satisfies DocumentDiagnosticReport;
+  } else {
+    return {
+      kind: DocumentDiagnosticReportKind.Full,
+      items: []
+    } satisfies DocumentDiagnosticReport;
+  }
+}
+
+async function sendDiagnostics(textDocument: TextDocument): Promise<void> {
+  try {
+    const diagnostics = await getTextDocumentDiagnostics(textDocument)
+    // Send the computed diagnostics to VSCode
+    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics: diagnostics.items });
+  } catch (error) {
+    connection.console.error(`Error validating document ${textDocument.uri}: ${error}`);
+    // Send empty diagnostics on error to clear any existing ones
+    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics: [] });
+  }
+}
+
+
+// Hover provider
+connection.onHover(async (params): Promise<Hover | null> => {
+  try {
+    const document = documents.get(params.textDocument.uri);
+    if (!document) {
+      return null;
+    }
+
+    const settings = await getDocumentSettings(document.uri);
+
+    if (!settings.enabledFeatures?.hover) {
+      return null;
+    }
+
+    return hoverProvider.provideHover(document, params.position, settings);
+  } catch (error) {
+    connection.console.error(`Error in hover provider: ${error}`);
     return null;
   }
 
-  // TODO: Always returning true.
-  let mode: LanguageMode | null | undefined = null
+})
 
-  switch (document.languageId) {
-    // CSS does not accept nested languages.
-    case "css": {
-      mode = languageModes.getMode("css")
-      break;
-    }
-    default: {
-      mode = languageModes.getModeAtPosition(document, textDocumentPosition.position);
-    }
+
+function getDocumentSettings(resource: string): Thenable<NunjucksSettings> {
+  if (!hasConfigurationCapability) {
+    return Promise.resolve(globalSettings);
+  }
+  let result = documentSettings.get(resource);
+  if (!result) {
+    result = connection.workspace.getConfiguration({
+      scopeUri: resource,
+      section: 'nunjucksLsp'
+    });
+    documentSettings.set(resource, result);
+  }
+  return result;
+}
+
+// Completion provider
+connection.onCompletion(async (textDocumentPosition: TextDocumentPositionParams): Promise<CompletionItem[]> => {
+  const document = documents.get(textDocumentPosition.textDocument.uri);
+  if (!document) {
+    return [];
   }
 
-  // appendFileSync(debugFile, "mode: " + (mode?.getId() || ""))
-  // appendFileSync(debugFile, waStylesheet)
+  const settings = await getDocumentSettings(document.uri);
 
-  if (!mode || !mode.doComplete) {
-    return CompletionList.create();
+  if (!settings.enabledFeatures.completion) {
+    return [];
   }
 
-  const doComplete = mode.doComplete;
-
-  let completionList = CompletionList.create()
-  completionList = doComplete?.(document, textDocumentPosition.position);
-
-  if (mode.getId() === "css" && cssVariableCompletions.length > 0) {
-    completionList.items = completionList.items.concat(cssVariableCompletions)
-    completionList.items = completionList.items.concat(cssUtilityClasses)
-  }
-
-  return completionList
+  return nunjucksCompletionProvider.provideCompletions(document, textDocumentPosition.position, settings);
 });
 
+// Completion resolve provider
 // This handler resolves additional information for the item selected in
 // the completion list.
 // Required by VSCode.
-connection.onCompletionResolve(
-  (item: CompletionItem): CompletionItem => {
-    return item;
-  }
-);
+// Completion resolve provider
+connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
+  return nunjucksCompletionProvider.resolveCompletion(item);
+});
 
+// Diagnostic provider
+connection.languages.diagnostics.on(async (params) => {
+  const diagnostics = await getTextDocumentDiagnostics(params.textDocument)
+  return diagnostics
+});
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events
