@@ -26,3 +26,15 @@ test("Should include quotes", () => {
   assert.equal(result!.word, "\"foo\"")
 })
 
+test("Should include quotes", () => {
+  const parser = new NunjucksParser({})
+  const hoverProvider = new NunjucksHoverProvider(parser)
+  const content = `<div>
+    {{ foo }}
+  </div>`
+  const lineNumber = 1
+  const colNumber = 7 // First "f" in "foo"
+  const result = hoverProvider.getWordAtCursor(content, colNumber, lineNumber)
+
+  assert.equal(result!.word, "\"foo\"")
+})

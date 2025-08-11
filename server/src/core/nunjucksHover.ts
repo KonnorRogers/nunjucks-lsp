@@ -4,6 +4,9 @@ import { Hover, MarkupKind, Position, Range } from "vscode-css-languageservice";
 import { NunjucksSettings } from "../settings/nunjucksSettings";
 import { getContext } from "./getContext";
 import * as definitions from "./definitions"
+import * as fs from "node:fs"
+import * as nodes from ""
+import { NodeList, printNodes } from "nunjucks/src/nodes.js";
 
 export class NunjucksHoverProvider {
   constructor(public parser: NunjucksParser) {}
@@ -23,20 +26,33 @@ export class NunjucksHoverProvider {
 
     if (!word) { return null }
 
+
+    const contentBeforeHoveredWord = this.sliceLine(contentBeforeOffset, word.range)
+    const content = previousContent + "\n" + contentBeforeHoveredWord + word.word
+
+    // fs.writeFileSync("/Users/konnorrogers/debug.log", content)
     // do we need to parse??
-    // const result = this.parser.parseContent(previousContent + "\n" + contentBeforeOffset.slice(0, contentBeforeOffset.length - word.word.length - 1) + word.word)
-    // const tokenStack = result.tokenStack
+    const result = this.parser.parseContent(content)
+
+
+
     // if (result.error) {
     //   // Just blindly try to get a hover word
     //   const hover = this.wordToHoverDocumentation(word);
     //   return hover
     // }
 
-    // const hover = this.wordToHoverDocumentationForToken(tokenStack, word);
-    const hover = this.wordToHoverDocumentation(word);
+    const hover = this.wordToHoverDocumentationForToken(result.ast, word);
 
     // Find what's at the current position
     return hover;
+  }
+
+  /**
+   * Walks back the content to just before the discovered word.
+   */
+  sliceLine (contentBeforeOffset: string, foundRange: Range) {
+    return contentBeforeOffset.slice(0, foundRange.start.character)
   }
 
   getWordAtCursor (lineContent: string, offset: number, lineNumber: number) {
@@ -87,8 +103,9 @@ export class NunjucksHoverProvider {
   /**
    * Provide a more contextual hover for a token
    */
-  wordToHoverDocumentationForToken(tokenStack: Token[], word: ReturnType<typeof this.getWordAtCursor>): Hover | null {
+  wordToHoverDocumentationForToken(ast: NodeList | null, word: ReturnType<typeof this.getWordAtCursor>): Hover | null {
     if (word == null) { return null }
+    if (!ast) { return null }
 
     const contents = {
       contents: {
@@ -100,28 +117,39 @@ export class NunjucksHoverProvider {
 
     const str = word.word
 
-    const lastToken = tokenStack[tokenStack.length - 1]
+    const originalStdoutWrite = process.stdout.write.bind(process.stdout);
 
-    contents.contents.value = JSON.stringify(lastToken)
-    return contents
+    let interceptedStr: string[] = []
+    // @ts-expect-error
+    process.stdout.write = (chunk, encoding, callback) => {
+      // Intercept, modify, or log the output here
+      interceptedStr.push(chunk.toString());
 
-
-    if (lastToken.type === "Tag" && definitions.tags[str]) {
-      contents.contents.value = "Tag: " + definitions.tags[str].documentation as string
-      return contents
-    }
-
-    if (lastToken.type === "Filter" && definitions.filters[str]) {
-      contents.contents.value = "Filter: " + definitions.filters[str].documentation as string
-      return contents
-    }
-
-    if (lastToken.type === "Global" && definitions.globalFunctions[str]) {
-      contents.contents.value = "Global function: " + definitions.globalFunctions[str].documentation as string
-      return contents
-    }
+      // Optionally, pass the output to the original stdout
+      // return originalStdoutWrite(chunk, encoding, callback);
+    };
+    printNodes(ast)
+    contents.contents.value = "AST: " + interceptedStr.join("") + "\n"
+    process.stdout.write = originalStdoutWrite
 
     return contents
+
+    // if (lastToken.type === "Tag" && definitions.tags[str]) {
+    //   contents.contents.value += "Tag: " + definitions.tags[str].documentation as string
+    //   return contents
+    // }
+
+    // if (lastToken.type === "Filter" && definitions.filters[str]) {
+    //   contents.contents.value += "Filter: " + definitions.filters[str].documentation as string
+    //   return contents
+    // }
+
+    // if (lastToken.type === "Global" && definitions.globalFunctions[str]) {
+    //   contents.contents.value += "Global function: " + definitions.globalFunctions[str].documentation as string
+    //   return contents
+    // }
+
+    // return contents
   }
 
   private wordToHoverDocumentation(word: ReturnType<typeof this.getWordAtCursor>): Hover | null {

@@ -14,25 +14,25 @@ export class NunjucksValidator {
   validateContent (content: string, settings: Partial<NunjucksSettings>): Diagnostic[] {
     const diagnostics: Diagnostic[] = [];
     const result = this.parser.parseContent(content)
-    if (result.ast) {
+
+    // no errors
+    if (!("error" in result)) {
       return diagnostics
     }
 
-    if (result.error) {
-      diagnostics.push({
-        message: result.error.message,
-        range: {
-          start: {
-            line: result.error.lineno,
-            character: result.error.colno,
-          },
-          end: {
-            line: result.error.lineno,
-            character: result.error.colno,
-          }
+    diagnostics.push({
+      message: result.error.message,
+      range: {
+        start: {
+          line: result.error.lineno,
+          character: result.error.colno,
+        },
+        end: {
+          line: result.error.lineno,
+          character: result.error.colno,
         }
-      })
-    }
+      }
+    })
 
     return diagnostics
   }

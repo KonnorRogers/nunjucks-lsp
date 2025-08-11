@@ -15,7 +15,7 @@ interface LexerOptions {
 
 interface Token {
   type: string,
-  value: unknown,
+  value: string,
   lineno: number,
   colno: number
 }
@@ -44,20 +44,54 @@ declare class _Tokenizer implements LexerOptions {
 
 declare module 'nunjucks/src/lexer.js' {
   class Tokenizer extends _Tokenizer {}
-  const lex: (src: string, opts?: Partial<LexerOptions>) => Tokenizer
+  export const lex: (src: string, opts?: Partial<LexerOptions>) => Tokenizer
+  export const BLOCK_START = '{%';
+  export const BLOCK_END = '%}';
+  export const VARIABLE_START = '{{';
+  export const VARIABLE_END = '}}';
+  export const COMMENT_START = '{#';
+  export const COMMENT_END = '#}';
 
-  export {
-    lex
-  };
+  export const TOKEN_STRING = 'string';
+  export const TOKEN_WHITESPACE = 'whitespace';
+  export const TOKEN_DATA = 'data';
+  export const TOKEN_BLOCK_START = 'block-start';
+  export const TOKEN_BLOCK_END = 'block-end';
+  export const TOKEN_VARIABLE_START = 'variable-start';
+  export const TOKEN_VARIABLE_END = 'variable-end';
+  export const TOKEN_COMMENT = 'comment';
+  export const TOKEN_LEFT_PAREN = 'left-paren';
+  export const TOKEN_RIGHT_PAREN = 'right-paren';
+  export const TOKEN_LEFT_BRACKET = 'left-bracket';
+  export const TOKEN_RIGHT_BRACKET = 'right-bracket';
+  export const TOKEN_LEFT_CURLY = 'left-curly';
+  export const TOKEN_RIGHT_CURLY = 'right-curly';
+  export const TOKEN_OPERATOR = 'operator';
+  export const TOKEN_COMMA = 'comma';
+  export const TOKEN_COLON = 'colon';
+  export const TOKEN_TILDE = 'tilde';
+  export const TOKEN_PIPE = 'pipe';
+  export const TOKEN_INT = 'int';
+  export const TOKEN_FLOAT = 'float';
+  export const TOKEN_BOOLEAN = 'boolean';
+  export const TOKEN_NONE = 'none';
+  export const TOKEN_SYMBOL = 'symbol';
+  export const TOKEN_SPECIAL = 'special';
+  export const TOKEN_REGEX = 'regex';
 }
 
 declare module 'nunjucks/src/parser.js' {
-  import { NodeList } from 'nunjucks/src/nodes.js'
+  import { InlineIf, NodeList, Node } from 'nunjucks/src/nodes.js'
 
   class Parser {
+    tokens: _Tokenizer
+    peeked: boolean | null;
+    breakOnBlocks: boolean | null;
+    dropLeadingWhitespace: boolean
+    extensions: Object[];
     constructor (tokenizer: _Tokenizer)
     init (tokenizer: _Tokenizer): void
-    nextToken (withWhitespace: boolean): Token
+    nextToken (withWhitespace?: boolean): Token
     peekToken (): Token
     pushToken (token: Token): void
     error (msg: string, lineno: number, colno: number): any // TemplateError
@@ -68,49 +102,49 @@ declare module 'nunjucks/src/parser.js' {
     skipSymbol (val: Token["value"]): boolean
     advanceAfterBlockEnd (name?: Token["type"]): Token
     advanceAfterVariableEnd (): void
-    // TODO: Get all nodes.
-    // parseFor
-    // parseMacro
-    // parseCall
-    // parseWithContext
-    // parseImport
-    // parseFrom
-    // parseBlock
-    // parseExtends
-    // parseInclude
-    // parseIf
-    // parseSet
-    // parseSwitch
-    // parseStatement
-    // parseRaw
-    // parsePostfix
-    // parseExpression
-    // parseOr
-    // parseAnd
-    // parseNot
-    // parseIn
-    // parseIs
-    // parseCompare
-    // parseConcat
-    // parseAdd
-    // parseSub
-    // parseMul
-    // parseDiv
-    // parseFloorDiv
-    // parseMod
-    // parsePow
-    // parseUnary
-    // parsePrimary
-    // parseFilterName
-    // parseFilterArgs
-    // parseFilter
-    // parseFilterStatement
-    // parseAggregate
-    // parseSignature
-    // parseUntilBlocks
-    // parseNodes
-    // parse
     parseAsRoot (...args: any[]): NodeList
+    // TODO: these are incomplete
+    parseFor(): void
+    parseMacro(): void
+    parseCall(): void
+    parseWithContext(): void
+    parseImport(): void
+    parseFrom(): void
+    parseBlock(): void
+    parseExtends(): void
+    parseInclude(): void
+    parseIf(): void
+    parseSet(): void
+    parseSwitch(): void
+    parseStatement(): Node
+    parseRaw(): void
+    parsePostfix(): void
+    parseExpression(): InlineIf
+    parseOr(): void
+    parseAnd(): void
+    parseNot(): void
+    parseIn(): void
+    parseIs(): void
+    parseCompare(): void
+    parseConcat(): void
+    parseAdd(): void
+    parseSub(): void
+    parseMul(): void
+    parseDiv(): void
+    parseFloorDiv(): void
+    parseMod(): void
+    parsePow(): void
+    parseUnary(): void
+    parsePrimary(): void
+    parseFilterName(): void
+    parseFilterArgs(): void
+    parseFilter(): void
+    parseFilterStatement(): void
+    parseAggregate(): void
+    parseSignature(): void
+    parseUntilBlocks(): void
+    parseNodes(): void
+    parse(): void
   }
 
   function parse(src: string, extensions: any, opts: LexerOptions): any
@@ -125,11 +159,13 @@ declare module 'nunjucks/src/nodes.js' {
       get typename(): string
       get fields(): string[]
       init<T extends typeof Node>(this: T, lineno: number, colno: number, ...args: any[]): T
+      constructor(lineno: number, colno: number, ...args: any[])
       findAll<T extends {new (...args: any[]): any}>(type: T, results?: (InstanceType<T>)[]): InstanceType<T>[]
       iterFields(callback: (value: this[keyof this], field: keyof this) => void): void
   }
   class NodeList extends Node {
-    init<T extends typeof Node>(this: T, lineno: number, colno: number, nodes?: Node[]): T
+    init<T extends typeof Node>(this: T, lineno: number, colno: number, nodes?: Array<AnyNode>): T
+    constructor(lineno: number, colno: number, nodes?: Array<AnyNode>)
     get fields(): ["children"]
     addChild(node: Node): void
   }
@@ -146,9 +182,9 @@ declare module 'nunjucks/src/nodes.js' {
     get fields(): ["key", "value"]
   }
   class Dict extends NodeList {}
-  class Output extends Node {}
+  class Output extends NodeList {}
   class Capture extends Node {}
-  class TemplateData extends Node {}
+  class TemplateData extends Literal {}
   class If extends Node {
     get fields(): ['cond', 'body', 'else_']
   }
@@ -218,6 +254,69 @@ declare module 'nunjucks/src/nodes.js' {
   class CallExtensionAsync extends Node {}
   function print(str: string, indent: string, line: number): void
   function printNodes(node: NodeList, indent?: string): void
+
+  /**
+   * Theses types aren't supported by nunjucks, but added to cover all possible nodes which can be needed for some call sites.
+   */
+  export type AnyNode = AllNodes[keyof AllNodes]
+  export type AllNodes = [
+    Node,
+    Root,
+    NodeList,
+    Value,
+    Literal,
+    Symbol,
+    Group,
+    ArrayNode,
+    Pair,
+    Dict,
+    Output,
+    Capture,
+    TemplateData,
+    If,
+    IfAsync,
+    InlineIf,
+    For,
+    AsyncEach,
+    AsyncAll,
+    Macro,
+    Caller,
+    Import,
+    FromImport,
+    FunCall,
+    Filter,
+    FilterAsync,
+    KeywordArgs,
+    Block,
+    Super,
+    TemplateRef,
+    Extends,
+    Include,
+    Set,
+    Switch,
+    Case,
+    LookupVal,
+    BinOp,
+    In,
+    Is,
+    Or,
+    And,
+    Not,
+    Add,
+    Concat,
+    Sub,
+    Mul,
+    Div,
+    FloorDiv,
+    Mod,
+    Pow,
+    Neg,
+    Pos,
+    Compare,
+    CompareOperand,
+    CallExtension,
+    CallExtensionAsync,
+  ]
 
   export {
     Node,
