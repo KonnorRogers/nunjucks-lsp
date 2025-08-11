@@ -1,3 +1,14 @@
+## DO NOT USE THIS
+
+Heavily in progress nunjucks LSP. lots of features missing.
+
+[ ] - Integrate data types
+[ ] - Custom Environments
+[ ] - Custom Functions
+[ ] - Custom providers (IE: 11ty)
+[ ] - Error recovery
+[ ] - Hover / Completions based on current token
+
 # Minimum Viable VS Code Language Server Extension
 
 NOTE: This is heavily based on [lsp-sample from vscode-extension-samples][sample] with the goal of removing example-specific code to ease starting a new Language Server.
