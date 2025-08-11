@@ -81,7 +81,7 @@ declare module 'nunjucks/src/lexer.js' {
 }
 
 declare module 'nunjucks/src/parser.js' {
-  import { InlineIf, NodeList, Node } from 'nunjucks/src/nodes.js'
+  import { InlineIf, NodeList, Node, Root } from 'nunjucks/src/nodes.js'
 
   class Parser {
     tokens: _Tokenizer
@@ -102,7 +102,7 @@ declare module 'nunjucks/src/parser.js' {
     skipSymbol (val: Token["value"]): boolean
     advanceAfterBlockEnd (name?: Token["type"]): Token
     advanceAfterVariableEnd (): void
-    parseAsRoot (...args: any[]): NodeList
+    parseAsRoot (...args: any[]): Root
     // TODO: these are incomplete
     parseFor(): void
     parseMacro(): void
@@ -155,103 +155,109 @@ declare module 'nunjucks/src/parser.js' {
 }
 
 declare module 'nunjucks/src/nodes.js' {
-  class Node extends Object {
-      get typename(): string
+  class Node<T extends string = "Node"> extends Object {
+      get typename(): T
       get fields(): string[]
+      lineno: number
+      colno: number
       init<T extends typeof Node>(this: T, lineno: number, colno: number, ...args: any[]): T
       constructor(lineno: number, colno: number, ...args: any[])
       findAll<T extends {new (...args: any[]): any}>(type: T, results?: (InstanceType<T>)[]): InstanceType<T>[]
       iterFields(callback: (value: this[keyof this], field: keyof this) => void): void
   }
-  class NodeList extends Node {
-    init<T extends typeof Node>(this: T, lineno: number, colno: number, nodes?: Array<AnyNode>): T
+  class NodeList<T extends string = "NodeList"> extends Node<T> {
+    get typename(): T
+    init<T extends typeof Node<U>, U extends string>(this: T, lineno: number, colno: number, nodes?: Array<AnyNode>): T
     constructor(lineno: number, colno: number, nodes?: Array<AnyNode>)
     get fields(): ["children"]
-    addChild(node: Node): void
+    children: AnyNode[]
+    addChild(node: AnyNode): void
   }
-  class Root extends NodeList {}
-  class Value extends Node {
+  class Root<T extends string = "Root"> extends NodeList<T> {}
+  class Value<T extends string = "Value"> extends Node<T> {
     get fields(): ["value"]
     get value(): string
   }
-  class Literal extends Value {}
-  class Symbol extends Value {}
-  class Group extends NodeList {}
-  class ArrayNode extends NodeList {}
-  class Pair extends Node {
+  class Literal<T extends string = "Literal"> extends Value<T> {}
+  class Symbol<T extends string = "Symbol"> extends Value<T> {}
+  class Group<T extends string = "Group"> extends NodeList<T> {}
+  class ArrayNode<T extends string = "ArrayNode"> extends NodeList<T> {}
+  class Pair<T extends string = "Pair"> extends Node<T> {
     get fields(): ["key", "value"]
+    key: string
+    value: string
   }
-  class Dict extends NodeList {}
-  class Output extends NodeList {}
-  class Capture extends Node {}
-  class TemplateData extends Literal {}
-  class If extends Node {
+  class Dict<T extends string = "Dict"> extends NodeList<T> {}
+  class Output<T extends string = "Output"> extends NodeList<T> {}
+  class Capture<T extends string = "Capture"> extends Node<T> {}
+  class TemplateData<T extends string = "TemplateData"> extends Literal<T> {}
+  class If<T extends string = "If"> extends Node<T> {
     get fields(): ['cond', 'body', 'else_']
   }
-  class IfAsync extends If {}
-  class InlineIf extends Node {}
-  class For extends Node {
+  class IfAsync<T extends string = "IfAsync"> extends If<T> {}
+  class InlineIf<T extends string = "InlineIf"> extends Node<T> {}
+  class For<T extends string = "For"> extends Node<T> {
     get fields(): ['arr', 'name', 'body', 'else_']
   }
-  class AsyncEach extends For {}
-  class AsyncAll extends For {}
-  class Macro extends Node {
+  class AsyncEach<T extends string = "AsyncEach"> extends For<T> {}
+  class AsyncAll<T extends string = "AsyncAll"> extends For<T> {}
+  class Macro<T extends string = "Macro"> extends Node<T> {
     get fields(): ['name', 'args', 'body']
   }
-  class Caller extends Macro {}
-  class Import extends Node {
+  class Caller<T extends string = "Caller"> extends Macro<T> {}
+  class Import<T extends string = "Import"> extends Node<T> {
     get fields(): ['template', 'target', 'withContext']
   }
-  class FromImport extends Node {
-    get typename(): "FromImport"
+  class FromImport<T extends string = "FromImport"> extends Node<T> {
     get fields(): ['template', 'names', 'withContext']
     init<T extends typeof Node, U extends NodeList = NodeList>(lineno: number, colno: number, template: string, names: U | undefined, withContext: any): T
   }
-  class FunCall extends Node {
+  class FunCall<T extends string = "FunCall"> extends Node<T> {
     get fields(): ['name', 'args']
   }
-  class Filter extends FunCall {}
-  class FilterAsync extends Node {
+  class Filter<T extends string = "Filter"> extends FunCall<T> {}
+  class FilterAsync<T extends string = "FilterAsync"> extends Node<T> {
     get fields(): ['name', 'args', 'symbol']
   }
-  class KeywordArgs extends Dict {}
-  class Block extends Node {
+  class KeywordArgs<T extends string = "KeywordArgs"> extends Dict<T> {}
+  class Block<T extends string = "Block"> extends Node<T> {
     get fields(): ['name', 'body']
   }
-  class Super extends Node {
+  class Super<T extends string = "Super"> extends Node<T> {
     get fields(): ['blockName', 'symbol']
   }
-  class TemplateRef extends Node {
+  class TemplateRef<T extends string = "TemplateRef"> extends Node<T> {
     get fields(): ['template']
   }
-  class Extends extends TemplateRef {}
-  class Include extends Node {}
-  class Set extends Node {}
-  class Switch extends Node {}
-  class Case extends Node {}
-  class LookupVal extends Node {
+  class Extends<T extends string = "Extends"> extends TemplateRef<T> {}
+  class Include<T extends string = "Include"> extends Node<T> {}
+  class Set<T extends string = "Set"> extends Node<T> {}
+  class Switch<T extends string = "Switch"> extends Node<T> {}
+  class Case<T extends string = "Case"> extends Node<T> {}
+  class LookupVal<T extends string = "LookupVal"> extends Node<T> {
     get fields(): ['target', 'val']
   }
-  class BinOp extends Node {}
-  class In extends Node {}
-  class Is extends Node {}
-  class Or extends Node {}
-  class And extends Node {}
-  class Not extends Node {}
-  class Add extends Node {}
-  class Concat extends Node {}
-  class Sub extends Node {}
-  class Mul extends Node {}
-  class Div extends Node {}
-  class FloorDiv extends Node {}
-  class Mod extends Node {}
-  class Pow extends Node {}
-  class Neg extends Node {}
-  class Pos extends Node {}
-  class Compare extends Node {}
-  class CompareOperand extends Node {}
-  class CallExtension extends Node {}
-  class CallExtensionAsync extends Node {}
+  class BinOp<T extends string = "BinOp"> extends Node<T> {}
+  class In<T extends string = "In"> extends Node<T> {}
+  class Is<T extends string = "Is"> extends Node<T> {}
+  class Or<T extends string = "Or"> extends Node<T> {}
+  class And<T extends string = "And"> extends Node<T> {}
+  class Not<T extends string = "Not"> extends Node<T> {}
+  class Add<T extends string = "Add"> extends Node<T> {}
+  class Concat<T extends string = "Concat"> extends Node<T> {}
+  class Sub<T extends string = "Sub"> extends Node<T> {}
+  class Mul<T extends string = "Mul"> extends Node<T> {}
+  class Div<T extends string = "Div"> extends Node<T> {}
+  class FloorDiv<T extends string = "FloorDiv"> extends Node<T> {}
+  class Mod<T extends string = "Mod"> extends Node<T> {}
+  class Pow<T extends string = "Pow"> extends Node<T> {}
+  class Neg<T extends string = "Neg"> extends Node<T> {}
+  class Pos<T extends string = "Pos"> extends Node<T> {}
+  class Compare<T extends string = "Compare"> extends Node<T> {}
+  class CompareOperand<T extends string = "CompareOperand"> extends Node<T> {}
+  class CallExtension<T extends string = "CallExtension"> extends Node<T> {}
+  class CallExtensionAsync<T extends string = "CallExtensionAsync"> extends Node<T> {}
+
   function print(str: string, indent: string, line: number): void
   function printNodes(node: NodeList, indent?: string): void
 
@@ -259,64 +265,64 @@ declare module 'nunjucks/src/nodes.js' {
    * Theses types aren't supported by nunjucks, but added to cover all possible nodes which can be needed for some call sites.
    */
   export type AnyNode = AllNodes[keyof AllNodes]
-  export type AllNodes = [
-    Node,
-    Root,
-    NodeList,
-    Value,
-    Literal,
-    Symbol,
-    Group,
-    ArrayNode,
-    Pair,
-    Dict,
-    Output,
-    Capture,
-    TemplateData,
-    If,
-    IfAsync,
-    InlineIf,
-    For,
-    AsyncEach,
-    AsyncAll,
-    Macro,
-    Caller,
-    Import,
-    FromImport,
-    FunCall,
-    Filter,
-    FilterAsync,
-    KeywordArgs,
-    Block,
-    Super,
-    TemplateRef,
-    Extends,
-    Include,
-    Set,
-    Switch,
-    Case,
-    LookupVal,
-    BinOp,
-    In,
-    Is,
-    Or,
-    And,
-    Not,
-    Add,
-    Concat,
-    Sub,
-    Mul,
-    Div,
-    FloorDiv,
-    Mod,
-    Pow,
-    Neg,
-    Pos,
-    Compare,
-    CompareOperand,
-    CallExtension,
-    CallExtensionAsync,
-  ]
+  export type AllNodes = {
+    Node: Node<"Node">,
+    Root: Root<"Root">,
+    NodeList: NodeList<"NodeList">,
+    Value: Value<"Value">,
+    Literal: Literal<"Literal">,
+    Symbol: Symbol<"Symbol">,
+    Group: Group<"Group">,
+    ArrayNode: ArrayNode<"ArrayNode">,
+    Pair: Pair<"Pair">,
+    Dict: Dict<"Dict">,
+    Output: Output<"Output">,
+    Capture: Capture<"Capture">,
+    TemplateData: TemplateData<"TemplateData">,
+    If: If<"If">,
+    IfAsync: IfAsync<"IfAsync">,
+    InlineIf: InlineIf<"InlineIf">,
+    For: For<"For">,
+    AsyncEach: AsyncEach<"AsyncEach">,
+    AsyncAll: AsyncAll<"AsyncAll">,
+    Macro: Macro<"Macro">,
+    Caller: Caller<"Caller">,
+    Import: Import<"Import">,
+    FromImport: FromImport<"FromImport">,
+    FunCall: FunCall<"FunCall">,
+    Filter: Filter<"Filter">,
+    FilterAsync: FilterAsync<"FilterAsync">,
+    KeywordArgs: KeywordArgs<"KeywordArgs">,
+    Block: Block<"Block">,
+    Super: Super<"Super">,
+    TemplateRef: TemplateRef<"TemplateRef">,
+    Extends: Extends<"Extends">,
+    Include: Include<"Include">,
+    Set: Set<"Set">,
+    Switch: Switch<"Switch">,
+    Case: Case<"Case">,
+    LookupVal: LookupVal<"LookupVal">,
+    BinOp: BinOp<"BinOp">,
+    In: In<"In">,
+    Is: Is<"Is">,
+    Or: Or<"Or">,
+    And: And<"And">,
+    Not: Not<"Not">,
+    Add: Add<"Add">,
+    Concat: Concat<"Concat">,
+    Sub: Sub<"Sub">,
+    Mul: Mul<"Mul">,
+    Div: Div<"Div">,
+    FloorDiv: FloorDiv<"FloorDiv">,
+    Mod: Mod<"Mod">,
+    Pow: Pow<"Pow">,
+    Neg: Neg<"Neg">,
+    Pos: Pos<"Pos">,
+    Compare: Compare<"Compare">,
+    CompareOperand: CompareOperand<"CompareOperand">,
+    CallExtension: CallExtension<"CallExtension">,
+    CallExtensionAsync: CallExtensionAsync<"CallExtensionAsync">,
+  }
 
   export {
     Node,

@@ -16,7 +16,7 @@ export class NunjucksValidator {
     const result = this.parser.parseContent(content)
 
     // no errors
-    if (!("error" in result)) {
+    if (!result.error) {
       return diagnostics
     }
 

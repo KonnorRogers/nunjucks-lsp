@@ -2,12 +2,12 @@
 
 Heavily in progress nunjucks LSP. lots of features missing.
 
-[ ] - Integrate data types
-[ ] - Custom Environments
-[ ] - Custom Functions
-[ ] - Custom providers (IE: 11ty)
-[ ] - Error recovery
-[ ] - Hover / Completions based on current token
+- [ ] - Integrate data types
+- [ ] - Custom Environments
+- [ ] - Custom Functions
+- [ ] - Custom providers / data (IE: 11ty)
+- [ ] - Error recovery
+- [ ] - Hover / Completions based on current token
 
 # Minimum Viable VS Code Language Server Extension
 

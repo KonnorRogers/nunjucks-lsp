@@ -18,7 +18,7 @@ test("Should properly validate the AST", () => {
 
   assert.equal(diagnostics.length, 1)
 
-  assert.equal({
+  assert.deepEqual({
     message: 'expected variable end',
     range: {
       start: { line: 3, character: 14 },

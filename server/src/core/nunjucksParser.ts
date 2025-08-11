@@ -1,10 +1,8 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
-import * as util from "node:util"
 import * as lexer from 'nunjucks/src/lexer.js'
 import * as nodes from 'nunjucks/src/nodes.js'
 import { Parser } from "nunjucks/src/parser.js";
-
-import {Template} from "nunjucks/src/environment.js"
+import { Range } from "vscode-languageserver";
 
 // interface NunjucksTemplateInfo {
 //   error: {
@@ -25,7 +23,7 @@ class ExtendedParser extends Parser {
     super.pushToken(token)
   }
 
-  safeParseAsRoot (): { ast: nodes.NodeList } | { error: Error & { lineno: number, colno: number }, ast: nodes.NodeList }   {
+  safeParseAsRoot (): { error: null, ast: nodes.Root } | { error: Error & { lineno: number, colno: number }, ast: nodes.Root }   {
     let parsedNodes: nodes.AnyNode[] = []
     try {
       parsedNodes = this.parseNodes()
@@ -35,12 +33,13 @@ class ExtendedParser extends Parser {
       parsedNodes = this.buf
 
       return {
-        error: error as Error,
+        error: error as Error & { lineno: number, colno: number },
         ast: this.parseAsRoot(parsedNodes)
       }
     }
 
     return {
+      error: null,
       ast: this.parseAsRoot(parsedNodes)
     }
   }
@@ -84,9 +83,9 @@ class ExtendedParser extends Parser {
           data = data.replace(/\s*$/, '');
         }
 
-        buf.push(new nodes.Output(tok.lineno,
+        buf.push(new nodes.Output<"Output">(tok.lineno,
           tok.colno,
-          [new nodes.TemplateData(tok.lineno,
+          [new nodes.TemplateData<"TemplateData">(tok.lineno,
             tok.colno,
             data)]));
       } else if (tok.type === lexer.TOKEN_BLOCK_START) {
@@ -100,7 +99,7 @@ class ExtendedParser extends Parser {
         const e = this.parseExpression();
         this.dropLeadingWhitespace = false;
         this.advanceAfterVariableEnd();
-        buf.push(new nodes.Output(tok.lineno, tok.colno, [e]));
+        buf.push(new nodes.Output<"Output">(tok.lineno, tok.colno, [e]));
       } else if (tok.type === lexer.TOKEN_COMMENT) {
         this.dropLeadingWhitespace = tok.value.charAt(
           tok.value.length - this.tokens.tags.COMMENT_END.length - 1
@@ -130,5 +129,32 @@ export class NunjucksParser {
   parseContent (content: string) {
     const parser = new ExtendedParser(lexer.lex(content));
     return parser.safeParseAsRoot()
+  }
+
+  findNodeInRange(node: nodes.AnyNode, range: Range): nodes.AnyNode | null {
+    let foundNode: nodes.AnyNode | null = null
+
+    // Search children first. "depth-first"
+    if ("children" in node) {
+      for (const child of node.children) {
+        foundNode = this.findNodeInRange(child, range)
+        if (foundNode) {
+          return foundNode
+        }
+      }
+    }
+
+    // cols and lines in nunjucks are 1-indexed -_-
+    const offset = 1
+    if (!foundNode) {
+      if (node.lineno >= range.start.line - offset && node.lineno <= range.end.line - offset) {
+        if (node.colno >= range.start.character - offset && node.colno <= range.end.character - offset) {
+          foundNode = node
+          return foundNode
+        }
+      }
+    }
+
+    return foundNode
   }
 }
