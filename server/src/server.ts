@@ -13,21 +13,19 @@ import {
   TextDocumentPositionParams,
   TextDocumentIdentifier,
   DidChangeWatchedFilesNotification,
+  ExecuteCommandParams,
+  WorkspaceEdit,
+  ApplyWorkspaceEditParams
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
-    CompletionList,
-    Hover,
-    LanguageMode,
-  // CompletionList,
-  // LanguageMode,
+  Hover,
   LanguageModes,
   getLanguageModes
 } from "./languageModes";
 
 import {
-  // appendFileSync,
   writeFileSync
 } from "fs";
 import { NunjucksSettings } from "./settings/nunjucksSettings";
@@ -36,8 +34,10 @@ import { NunjucksCompletionProvider } from "./core/nunjucksCompletion";
 import { NunjucksValidator } from "./core/nunjucksValidator";
 import { NunjucksHoverProvider } from "./core/nunjucksHover";
 
-const debugFile = "/Users/konnorrogers/debug.log"
-writeFileSync(debugFile, "")
+const RESTART_COMMAND = 'nunjucks-lsp.restart';
+
+// const debugFile = "/Users/konnorrogers/debug.log"
+// writeFileSync(debugFile, "")
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -67,24 +67,59 @@ const defaultSettings: NunjucksSettings = {
 let globalSettings: NunjucksSettings = defaultSettings;
 
 // Initialize analyzers
-const parser = new NunjucksParser(defaultSettings);
-const nunjucksCompletionProvider = new NunjucksCompletionProvider(parser);
-const nunjucksValidator = new NunjucksValidator(parser);
-const nunjucksHoverProvider = new NunjucksHoverProvider(parser)
+let parser = new NunjucksParser(defaultSettings);
+let nunjucksCompletionProvider = new NunjucksCompletionProvider(parser);
+let nunjucksValidator = new NunjucksValidator(parser);
+let nunjucksHoverProvider = new NunjucksHoverProvider(parser)
 
 
 // Cache the settings of all open documents
 const documentSettings: Map<string, Thenable<NunjucksSettings>> = new Map();
 
+async function restartServer () {
+  try {
+    connection.console.log('Restarting Nunjucks LSP server...');
+
+    // Clear document settings cache
+    documentSettings.clear();
+
+    // Reinitialize language modes
+    if (languageModes) {
+      languageModes.dispose();
+    }
+    languageModes = getLanguageModes();
+
+    // Reinitialize analyzers with current settings
+    parser = new NunjucksParser(globalSettings);
+    nunjucksCompletionProvider = new NunjucksCompletionProvider(parser);
+    nunjucksValidator = new NunjucksValidator(parser);
+    nunjucksHoverProvider = new NunjucksHoverProvider(parser);
+
+    // Revalidate all open documents
+    const allDocs = documents.all();
+    for (const doc of allDocs) {
+      await sendDiagnostics(doc);
+    }
+
+    connection.console.log('Nunjucks LSP server restarted successfully');
+
+    // Show info message to user
+    connection.window.showInformationMessage('Nunjucks LSP server has been restarted');
+  } catch (error) {
+    connection.console.error(`Error during server restart: ${error}`);
+    connection.window.showErrorMessage(`Failed to restart Nunjucks LSP server: ${error}`);
+  }
+}
+
 connection.onInitialize((params: InitializeParams) => {
   languageModes = getLanguageModes();
 
   documents.onDidClose(e => {
-	  languageModes.onDocumentRemoved(e.document);
-          documentSettings.delete(e.document.uri);
+    languageModes.onDocumentRemoved(e.document);
+    documentSettings.delete(e.document.uri);
   });
   connection.onShutdown(() => {
-	  languageModes.dispose();
+    languageModes.dispose();
   });
   const capabilities = params.capabilities;
 
@@ -112,6 +147,10 @@ connection.onInitialize((params: InitializeParams) => {
       diagnosticProvider: {
         interFileDependencies: true,
         workspaceDiagnostics: false
+      },
+      // Add execute command provider for restart functionality
+      executeCommandProvider: {
+        commands: [RESTART_COMMAND]
       }
     },
     serverInfo: {
@@ -141,23 +180,50 @@ connection.onInitialized(() => {
   })
 });
 
-connection.onDidChangeConfiguration(change => {
+connection.onDidChangeConfiguration(async (change) => {
   if (hasConfigurationCapability) {
     // Reset all cached document settings
     documentSettings.clear();
   } else {
     globalSettings = <NunjucksSettings>(
-      (change.settings.nunjucksLsp || defaultSettings)
+      (change.settings["nunjucks-lsp"] || defaultSettings)
     );
   }
 
   // Revalidate all open text documents
-  documents.all().forEach(sendDiagnostics);
+  // documents.all().forEach(sendDiagnostics);
+  await restartServer()
 });
+
+connection.onExecuteCommand(async (params: ExecuteCommandParams) => {
+  if (params.command === RESTART_COMMAND) {
+    await restartServer()
+  }
+})
 
 // The content of a text document has changed
 documents.onDidChangeContent(change => {
   sendDiagnostics(change.document);
+});
+
+// Watch for file changes that might require restart
+connection.onDidChangeWatchedFiles(async (params) => {
+  let needsRestart = false;
+
+  // Check if any template files were added/removed (might need restart)
+  for (const change of params.changes) {
+    if (change.uri.endsWith('.njk') || change.uri.endsWith('.nunjucks')) {
+      // File type: 1 = Created, 3 = Deleted
+      if (change.type === 1 || change.type === 3) {
+        needsRestart = true;
+        break;
+      }
+    }
+  }
+
+  if (needsRestart) {
+    await restartServer();
+  }
 });
 
 async function getTextDocumentDiagnostics (textDocument: TextDocumentIdentifier) {
@@ -230,7 +296,7 @@ function getDocumentSettings(resource: string): Thenable<NunjucksSettings> {
   if (!result) {
     result = connection.workspace.getConfiguration({
       scopeUri: resource,
-      section: 'nunjucksLsp'
+      section: 'nunjucks-lsp'
     });
     documentSettings.set(resource, result);
   }

@@ -9,6 +9,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import { NunjucksParser } from './nunjucksParser';
 import { NunjucksSettings } from '../settings/nunjucksSettings';
 import { getContext } from './getContext';
+import * as definitions from './definitions'
 
 export class NunjucksCompletionProvider {
   constructor(private parser: NunjucksParser) {}
@@ -31,7 +32,7 @@ export class NunjucksCompletionProvider {
 
     // result.ast.isPrototypeOf
 
-    return this.getGeneralCompletions();
+    return Object.values(definitions.generalCompletions);
     // switch (context.type) {
     //   default:
     //     return this.getGeneralCompletions(document);
@@ -46,30 +47,4 @@ export class NunjucksCompletionProvider {
     return item;
   }
 
-  private getGeneralCompletions(): CompletionItem[] {
-    // Return common Nunjucks constructs
-    return [
-      {
-        label: '{{ }}',
-        kind: CompletionItemKind.Snippet,
-        documentation: 'Variable',
-        insertText: '{{ $1 }}',
-        insertTextFormat: InsertTextFormat.Snippet
-      },
-      {
-        label: '{% %}',
-        kind: CompletionItemKind.Snippet,
-        documentation: 'Expression',
-        insertText: '{% $1 %}',
-        insertTextFormat: InsertTextFormat.Snippet
-      },
-      {
-        label: '{# #}',
-        kind: CompletionItemKind.Snippet,
-        documentation: 'Comment',
-        insertText: '{# $1 #}',
-        insertTextFormat: InsertTextFormat.Snippet
-      }
-    ];
-  }
 }

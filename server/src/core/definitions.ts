@@ -345,3 +345,27 @@ export const filters: Record<string, CompletionItem> = {
     insertTextFormat: InsertTextFormat.PlainText,
   },
 }
+
+export const generalCompletions = {
+  variable: {
+    label: '{{ }}',
+    kind: CompletionItemKind.Snippet,
+    documentation: 'Variable',
+    insertText: '{{ $1 }}',
+    insertTextFormat: InsertTextFormat.Snippet
+  },
+  expression: {
+    label: '{% %}',
+    kind: CompletionItemKind.Snippet,
+    documentation: 'Expression',
+    insertText: '{% $1 %}',
+    insertTextFormat: InsertTextFormat.Snippet
+  },
+  comment: {
+    label: '{# #}',
+    kind: CompletionItemKind.Snippet,
+    documentation: 'Comment',
+    insertText: '{# $1 #}',
+    insertTextFormat: InsertTextFormat.Snippet
+  }
+}

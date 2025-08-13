@@ -10,40 +10,34 @@
     "vscode": "^1.75.0"
   },
   "activationEvents": [
-    "onLanguage:plaintext",
-    "onLanguage:css",
-    "onLanguage:less",
-    "onLanguage:scss",
-    "onLanguage:sass",
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onLanguage:html",
-    "onLanguage:markdown",
-    "onLanguage:vue",
-    "onLanguage:svelte",
-    "onLanguage:jsx",
-    "onLanguage:javascriptreact",
-    "onLanguage:tsx",
-    "onLanguage:typescriptreact",
-    "workspaceContains:**/package.json"
+    "onLanguage:nunjucks",
+    "onLanguage:markdown"
   ],
   "main": "./client/out/vscode",
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc --build",
+    "build": "tsc --build",
     "watch": "tsc -b -w",
+    "start": "npm run watch",
     "postinstall": "cd client && npm install && cd ../server && npm install && cd .."
   },
   "devDependencies": {
-    "@types/node": "^20.5.7",
-    "typescript": "^5.2.2"
+    "@types/node": "^20.19.10",
+    "typescript": "^5.9.2"
   },
   "contributes": {
     "languages": [
       {
         "id": "nunjucks",
-        "aliases": ["Nunjucks", "nunjucks"],
-        "extensions": [".njk", ".nunjucks", ".html"],
+        "aliases": [
+          "Nunjucks",
+          "nunjucks"
+        ],
+        "extensions": [
+          ".njk",
+          ".nunjucks",
+          ".html"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -51,12 +45,21 @@
       "type": "object",
       "title": "Nunjucks LSP Configuration",
       "properties": {
-        "nunjucksLsp.templatePaths": {
+        "nunjucks-lsp.templatePaths": {
           "type": "array",
-          "default": ["./templates", "./views"],
+          "default": [
+            "./templates",
+            "./views"
+          ],
           "description": "Paths to search for Nunjucks templates"
         }
       }
-    }
+    },
+    "commands": [
+      {
+        "command": "nunjucks-lsp.restart",
+        "title": "Restart Nunjucks LSP Server"
+      }
+    ]
   }
 }
